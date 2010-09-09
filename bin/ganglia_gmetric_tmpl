@@ -1,0 +1,26 @@
+#
+# these are replaced on make
+#
+
+my %config = (
+		module => 'GmetricCassandra',
+);
+
+use Getopt::Long;
+Getopt::Long::Configure('no_ignore_case', 'bundling');
+GetOptions(
+		"module|s=s"   => \$config{module},
+);
+
+#
+# if eval error
+#
+if ($@){
+	die("The module $config{module} cannot be loaded was it installed?:$@");
+}
+
+#
+# initialize the object and run the gmetric
+#
+my $gmc = $config{module}->new();
+$gmc->run();
