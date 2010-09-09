@@ -1,0 +1,329 @@
+#!/usr/bin/perl
+package GmetricDelegate;
+use strict;
+
+
+my $GMETRIC = "/usr/bin/gmetric";
+my $VERSION = 0.01;
+
+sub new {
+	my $class = shift;
+	my $self  = {};
+	bless($self, $class);
+	return $self;
+}
+
+sub getGmetricCMD(){
+	my $self = shift;
+	return '/usr/bin/gmetric';
+}
+
+sub getSaveFileDir(){
+	my $self = shift;
+	return "/var/tmp";
+}
+
+
+sub getLastState { 
+	my $self = shift;
+
+	my $tmp_dir_base	= $self->getSaveFileDir();
+	my $tmp_stats_file	= $self->getFileName(); 
+	if (! -d $tmp_dir_base ){
+		system("/bin/mkdir -p $tmp_dir_base");
+	}
+
+	if (! -e $tmp_stats_file ){
+		return; # 1st run no file?
+	}
+
+	open(FH, "<$tmp_stats_file") or die($!);
+	while(<FH>){
+		my($k,$v) = split(/:/, $_);
+		$self->{prev_data}{$k} = $v;
+	}
+	
+	return $self->{prev_data};
+}
+
+
+sub saveState {
+	my $self		= shift;
+	my $key_value	= shift;
+
+	my $file		= $self->getFileName();
+
+	open(DUMP, ">$file") or die ($!);
+	
+	for my $k (keys %{$key_value}){
+		chomp($k);
+		chomp($key_value->{$k});
+		print DUMP "$k:$key_value->{$k}\n";
+	}
+	close(DUMP);
+}
+sub getPackagePrefix {
+	my $self = shift;
+	return '';
+}
+
+sub getCounterMetricHash{
+	my $self = shift;
+	my $counter = {};
+
+	return $counter; # I don't know which ones are every increasing need data.
+}
+
+sub getAbsoluteMetricHash{
+	my $self = shift;
+	my $absolute = {};
+	return $absolute;
+}
+sub sendGmetricData($$$){
+	my $self			= shift;
+	my $dataNow			= shift;
+	my $dataLastRun		= shift;
+
+	my $counter_metrics		= $self->getCounterMetricHash();
+	my $absolute_metrics	= $self->getAbsoluteMetricHash();
+	my $gmetric_command		= $self->getGmetricCMD();
+	my $units = '';
+	my $ganglia_prefix      = $self->getPackagePrefix();
+
+	#Get the time stamp when the stats file was last modified
+	my $old_time = (stat $self->getFileName())[9];
+	my $timedelta = 1;
+	if ($old_time){
+		$timedelta = time() - $old_time;
+	}
+	foreach my $metric (keys %{$dataNow}){
+		my $cmd = '';	
+		if ($units = $counter_metrics->{$metric}){
+			my $rate = $dataNow->{$metric} - $dataLastRun->{$metric}/$timedelta;
+			$cmd  = $gmetric_command . " -u '$units/sec' -tfloat -n $ganglia_prefix" . $metric . " -v " . $rate;
+			print $cmd,"\n";
+
+		} else {
+			if (!($units = $absolute_metrics->{$metric})){
+				$units = 'operations';
+			}
+			my $absolute = $dataNow->{$metric};
+			$cmd = $gmetric_command . " -u '$units/sec' -tfloat -n $ganglia_prefix" . $metric . " -v " . $absolute;
+			print $cmd,"\n";
+		}
+		system($cmd);
+	}
+}
+
+sub run() {
+	my $self = shift;
+
+	my $dataLastRun = $self->getLastState();
+	my $dataNow     = $self->getData();
+	$self->sendGmetricData($dataNow, $dataLastRun);
+	$self->saveState($dataNow);
+	return 1;
+}
+
+1;
+package GmetricCassandra;
+use strict;
+
+
+
+use base qw(GmetricDelegate);
+my $VERSION = 0.01;
+
+sub new {
+	my $class = shift;
+	my $self  = {};
+	bless($self, $class);
+	return $self;
+}
+
+sub getNodeToolCMD(){
+
+	my $self = shift;
+
+	return "/opt/cassandra/bin/nodetool -host localhost -port " . $self->getCassandraPort();
+
+}
+sub getCassandraPort(){
+
+	my $self = shift;
+	
+	return "8181";
+}
+
+sub getFileName {
+	my $self = shift;
+	$self->{save_file_name} = $self->getSaveFileDir() . "/cassandra.gmetric.data";
+	return $self->{save_file_name};
+}
+
+sub setData {
+	my $self = shift;
+	my $data = shift;
+	
+	$self->{gmetric_data} = $data;
+}
+
+sub getData {
+	my $self = shift;
+	
+	$self->{current_data} = {};
+	my $tpstats = $self->gettpstatsData();
+	my $cfstats = $self->getcfstatsData();
+	foreach my $k(keys %{$tpstats}){
+		$self->{current_data}{lc($k)} = $tpstats->{$k};
+	}
+	foreach my $k(keys %{$cfstats}){
+		if ($self->{current_data}{lc($k)}){
+			print "What key already exists\n";
+		}
+		$self->{current_data}{lc($k)} = $cfstats->{$k};
+	}
+	
+	
+			
+
+	return $self->{current_data};
+	
+}
+
+sub gettpstatsData{
+	my $self = shift;
+	my $cmd  = $self->getNodeToolCMD() . " tpstats";
+
+	open(CMD, $cmd . "|") or die("$cmd:$!\n");
+	my $hashref = {};
+	while(<CMD>){
+		next if ($_ =~ /^Pool Name/);
+		my ($key, $active, $pending, $completed) = split(/\s+/, $_);
+		$hashref->{$key} = $completed;
+
+	}
+	return $hashref;
+	close CMD;
+}
+
+sub getcfstatsData{
+	my $self = shift;
+	my $cmd  = $self->getNodeToolCMD() . " cfstats";
+
+	open(CMD, $cmd . "|") or die("$cmd:$!\n");
+	my $hashref = {};
+	my $found_user_keyspace = 0;
+	my $prefix = '';
+	while(<CMD>){
+
+		next if ($_ !~ /^--.+/ && $found_user_keyspace == 0);
+		$found_user_keyspace = 1;
+		
+		next if ($_ =~ /^--.+/);
+		my $line = $_;
+		chomp($line);
+		$line =~ s/^\t+//g;
+		next if (!$line);
+
+		if ($line =~ /^Keyspace: (\S+)/){
+			$prefix = "ks_$1";
+			next;
+		}
+
+		if ($line =~ /^Column Family: (\S+)/){
+			$prefix = "cf_$1";
+			next;
+		}
+
+		my ($k, $v) = split(":", $line);
+		$k =~ s/\s+/_/g;
+		$v =~ s/\s+//g;
+		$v =~ s/ms\.//g;
+		$v =~ s/NaN/0/g;
+		$hashref->{$prefix . '_' . $k} = $v;
+
+	}
+	return $hashref;
+	close CMD;
+}
+
+sub getinfoData {
+	my $self = shift;
+}
+
+sub getPackagePrefix{
+	return 'cass_';
+}
+
+sub getCounterMetricHash{
+	my $self = shift;
+
+	my $counter = {
+		'cf_treeclick_write_count' => 'writes',
+		'cf_standard2_memtable_switch_count' => 'switches',
+		'cf_complex_write_count' => 'writes', 
+		'cf_treeclick_memtable_columns_count' => 'columns',
+		'cf_treeclick_memtable_switch_count' => 'switches',
+		'cf_complex_read_count' => 'reads',
+		'cf_standardbytime_read_count' => 'reads',
+		'cf_standard2_read_count' => 'reads',
+		'cf_standardbytime_write_count' => 'writes',
+		'cf_standard2_memtable_columns_count' => 'columns',
+		'cf_standardbytime_memtable_switch_count' => 'switches',
+		'cf_complex_memtable_columns_count' => 'columns',
+		'cf_complex_memtable_switch_count' => 'switches',
+		'ks_timeframeclicks_read_count' => 'reads',
+		'ks_timeframeclicks_write_count' => 'writes',
+		'cf_standard2_write_count' => 'writes',
+		'cf_treeclick_read_count' => 'reads',
+		'cf_standardbytime_memtable_columns_count' => 'columns',
+		'cf_standard2_memtable_data_size' => 'growth',
+		'message-deserializer-pool' => 'count',
+		'row-mutation-stage' => 'mutation',
+		'messaging-service-pool' => 'count',
+		'gmfd' => '?',
+		'memtable-post-flusher' => 'flushes',
+		'row-read-stage' => 'reads',
+		'commitlog' => 'commits',
+		'flush-writer-pool' => 'writes',
+		'compaction-pool' => 'compactions',
+		'response-stage' => 'responses',
+	};
+	return $counter; # I don't know which ones are every increasing need data.
+}
+
+sub getAbsoluteMetricHash{
+	my $self = shift;
+	my $absolute = {};
+	return $absolute;
+}
+
+1;
+
+#
+# these are replaced on make
+#
+
+my %config = (
+		module => 'GmetricCassandra',
+);
+
+use Getopt::Long;
+Getopt::Long::Configure('no_ignore_case', 'bundling');
+GetOptions(
+		"module|s=s"   => \$config{module},
+);
+
+#
+# if eval error
+#
+if ($@){
+	die("The module $config{module} cannot be loaded was it installed?:$@");
+}
+
+#
+# initialize the object and run the gmetric
+#
+my $gmc = $config{module}->new();
+$gmc->run();
