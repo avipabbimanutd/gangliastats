@@ -1,10 +1,40 @@
 #!/usr/bin/perl
-package GmetricDelegate;
 use strict;
-
-
-my $GMETRIC = "%%GMETRIC_PATH%%";
 my $VERSION = 0.01;
+
+# This is mk-archiver, a program to archive records from one MySQL table to
+# a file and/or another table.
+#
+# This program is copyright 2010-Forever Dathan Pattishall dathan@rockyou.com
+# Feedback and improvements are welcome.
+#
+# THIS PROGRAM IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+# MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, version 2; OR the Perl Artistic License.  On UNIX and similar
+# systems, you can issue `man perlgpl' or `man perlartistic' to read these
+# licenses.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place, Suite 330, Boston, MA  02111-1307  USA.
+#
+
+
+
+# ###########################################################################
+# GmetricDelegate package
+#  assume this is a abstract class and getData getCounterMetricHash/getAbsoluteMetricHash need to be defined in the
+#  "subclass"
+#
+
+#
+# this is built via a make file
+#
+my $GMETRIC = "%%GMETRIC_PATH%%";
 
 sub new {
 	my $class = shift;
@@ -23,6 +53,9 @@ sub getSaveFileDir(){
 	return "/var/tmp";
 }
 
+#
+# get the last data points for a possible delta
+#
 
 sub getLastState { 
 	my $self = shift;
@@ -46,6 +79,9 @@ sub getLastState {
 	return $self->{prev_data};
 }
 
+#
+# save it for processing later
+#
 
 sub saveState {
 	my $self		= shift;
@@ -62,23 +98,50 @@ sub saveState {
 	}
 	close(DUMP);
 }
+
+#
+# define this in the subclass
+#
 sub getPackagePrefix {
 	my $self = shift;
 	return '';
 }
 
+#
+# define this in the subclass
+#
+
 sub getCounterMetricHash{
 	my $self = shift;
 	my $counter = {};
 
-	return $counter; # I don't know which ones are every increasing need data.
+	return $counter; 
 }
+
+#
+# define this in the subclass
+#
 
 sub getAbsoluteMetricHash{
 	my $self = shift;
 	my $absolute = {};
 	return $absolute;
 }
+
+#
+# define this in the subclass
+#
+
+sub getData{
+	my $self = shift;
+	my $data = {};
+	return $data;
+}
+
+#
+# send the stuff to ganglia
+#
+
 sub sendGmetricData($$$){
 	my $self			= shift;
 	my $dataNow			= shift;
@@ -115,6 +178,9 @@ sub sendGmetricData($$$){
 	}
 }
 
+#
+# do it.
+#
 sub run() {
 	my $self = shift;
 
