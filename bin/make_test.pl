@@ -21,15 +21,21 @@ while(my $line = <GMD>){
 }
 
 #
-# define the nodetool path
+# define the nodetool path and JMX port
 #
 while(my $line = <GMC>){
 	if ($line =~ /%\%NODETOOL_PATH%%/s){
 			$line =~ s/%\%NODETOOL_PATH%%/$ENV{'NODETOOL_PATH'}/g;
 	}
+	if ($line =~ /%\%JMX_PORT%%/s){
+			$line =~ s/%\%JMX_PORT%%/$ENV{'JMX_PORT'}/g;
+	}
 	$prepend .= $line;
 }
 
+#
+# close up to be clean
+#
 
 close(GMD);
 close(GMC);

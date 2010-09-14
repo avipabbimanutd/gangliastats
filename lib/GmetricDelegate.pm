@@ -1,9 +1,7 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 use strict;
 my $VERSION = 0.01;
 
-# This is mk-archiver, a program to archive records from one MySQL table to
-# a file and/or another table.
 #
 # This program is copyright 2010-Forever Dathan Pattishall dathan@rockyou.com
 # Feedback and improvements are welcome.
@@ -30,7 +28,7 @@ my $VERSION = 0.01;
 #  assume this is a abstract class and getData getCounterMetricHash/getAbsoluteMetricHash need to be defined in the
 #  "subclass"
 #
-
+package GmetricDelegate;
 #
 # this is built via a make file
 #
@@ -161,8 +159,9 @@ sub sendGmetricData($$$){
 	}
 	foreach my $metric (keys %{$dataNow}){
 		my $cmd = '';	
+		next if ($dataNow->{$metric} !~ /\d+/); #not a number then skip
 		if ($units = $counter_metrics->{$metric}){
-			my $rate = $dataNow->{$metric} - $dataLastRun->{$metric}/$timedelta;
+			my $rate = ($dataNow->{$metric} - $dataLastRun->{$metric})/$timedelta;
 			$cmd  = $gmetric_command . " -u '$units/sec' -tfloat -n $ganglia_prefix" . $metric . " -v " . $rate;
 			print $cmd,"\n";
 

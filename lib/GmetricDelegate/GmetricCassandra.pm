@@ -1,10 +1,36 @@
+
+#
+# This program is copyright 2010-Forever Dathan Pattishall dathan@rockyou.com
+# Feedback and improvements are welcome.
+#
+# THIS PROGRAM IS PROVIDED "AS IS" AND WITHOUT ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
+# MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, version 2; OR the Perl Artistic License.  On UNIX and similar
+# systems, you can issue `man perlgpl' or `man perlartistic' to read these
+# licenses.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+# Place, Suite 330, Boston, MA  02111-1307  USA.
+#
+
+
+# ###########################################################################
+# GmetricCassandra package
+#  this is a subclass of GmetricDelegate. It defines  getData getCounterMetricHash/getAbsoluteMetricHash
+#
+
 package GmetricCassandra;
 use strict;
 
 
 
 use base qw(GmetricDelegate);
-my $VERSION = 0.01;
+our $VERSION = 0.01;
 
 sub new {
 	my $class = shift;
@@ -13,18 +39,24 @@ sub new {
 	return $self;
 }
 
+
+#
+# choose this method instead of parsing JMX since its more portable and less dependancies. additionally this is suppose
+# to run on the cassandra boxes
+#
+
 sub getNodeToolCMD(){
 
 	my $self = shift;
 
-	return "%%NODETOOL_PATH%% -host localhost -port " . $self->getCassandraPort();
+	return "%%NODETOOL_PATH%% --host localhost --port " . $self->getCassandraPort();
 
 }
 sub getCassandraPort(){
 
 	my $self = shift;
 	
-	return "8181";
+	return '%%JMX_PORT%%';
 }
 
 sub getFileName {
@@ -113,6 +145,7 @@ sub getcfstatsData{
 		$v =~ s/\s+//g;
 		$v =~ s/ms\.//g;
 		$v =~ s/NaN/0/g;
+		$k =~ s/\((\S+)\)/$1/g;
 		$hashref->{$prefix . '_' . $k} = $v;
 
 	}
@@ -132,6 +165,9 @@ sub getCounterMetricHash{
 	my $self = shift;
 
 	my $counter = {
+#
+# customize cf and ks stats
+#
 		'cf_treeclick_write_count' => 'writes',
 		'cf_standard2_memtable_switch_count' => 'switches',
 		'cf_complex_write_count' => 'writes', 
@@ -151,23 +187,75 @@ sub getCounterMetricHash{
 		'cf_treeclick_read_count' => 'reads',
 		'cf_standardbytime_memtable_columns_count' => 'columns',
 		'cf_standard2_memtable_data_size' => 'growth',
-		'message-deserializer-pool' => 'count',
-		'row-mutation-stage' => 'mutation',
-		'messaging-service-pool' => 'count',
-		'gmfd' => '?',
-		'memtable-post-flusher' => 'flushes',
-		'row-read-stage' => 'reads',
-		'commitlog' => 'commits',
-		'flush-writer-pool' => 'writes',
-		'compaction-pool' => 'compactions',
-		'response-stage' => 'responses',
+#
+# tpstats
+#
+		'tpc_response-stage' => 'responses',
+		'tpc_row-read-stage' => 'row_reads',
+		'tpc_lb-operations'  => 'operations',
+		'tpc_message-deserializer-pool' => 'deserializations',
+		'tpc_gmfd' => '?',
+		'tpc_lb-target' => 'operations',
+		'tpc_consistency-manager' => 'operations',
+		'tpc_row-mutation-stage' => 'mutations',
+		'tpc_message-streaming-pool' => 'streams',
+		'tpc_load-balancer-stage'    => 'operations',
+		'tpc_flush-sorter-pool'      => 'operations',
+		'tpc_memtable-post-flusher' => 'flushes',
+		'tpc_flush-writer-pool' => 'writes',
+		'tpc_ae-service-stage' => 'operations',
+		'tpc_hinted-handoff-pool' => 'operations',
+		'tpc_messaging-service-pool' => 'operations',
+		'tpc_commitlog' => 'commits',
+		'tpc_compaction-pool' => 'compactions',
 	};
-	return $counter; # I don't know which ones are every increasing need data.
+	return $counter;
 }
 
+#
+# i might remove this as its seen its not needed.
+#
 sub getAbsoluteMetricHash{
 	my $self = shift;
-	my $absolute = {};
+	my $absolute = {
+		'tpa_response-stage'                    => 'responses',
+		'tpa_row-read-stage'                    => 'row_reads',
+		'tpa_lb-operations'                     => 'operations',
+		'tpa_message-deserializer-pool'			=> 'deserializations',
+		'tpa_gmfd'								=> '?',
+		'tpa_lb-target'                         => 'operations',
+		'tpa_consistency-manager'               => 'operations',
+		'tpa_row-mutation-stage'                => 'mutations',
+		'tpa_message-streaming-pool'			=> 'streams',
+		'tpa_load-balancer-stage'               => 'operations',
+		'tpa_flush-sorter-pool'                 => 'operations',
+		'tpa_memtable-post-flusher'             => 'flushes',
+		'tpa_flush-writer-pool'                 => 'writes',
+		'tpa_ae-service-stage'                  => 'operations',
+		'tpa_hinted-handoff-pool'               => 'operations',
+		'tpa_messaging-service-pool'			=> 'operations',
+		'tpa_commitlog'							=> 'commits',
+		'tpa_compaction-pool'                   => 'compactions',
+		'tpp_response-stage'                    => 'responses',
+		'tpp_row-read-stage'                    => 'row_reads',
+		'tpp_lb-operations'						=> 'operations',
+		'tpp_message-deserializer-pool'			=> 'deserializations',
+		'tpp_gmfd'                              => '?',
+		'tpp_lb-target'                         => 'operations',
+		'tpp_consistency-manager'               => 'operations',
+		'tpp_row-mutation-stage'                => 'mutations',
+		'tpp_message-streaming-pool'			=> 'streams',
+		'tpp_load-balancer-stage'               => 'operations',
+		'tpp_flush-sorter-pool'                 => 'operations',
+		'tpp_memtable-post-flusher'             => 'flushes',
+		'tpp_flush-writer-pool'                 => 'writes',
+		'tpp_ae-service-stage'                  => 'operations',
+		'tpp_hinted-handoff-pool'               => 'operations',
+		'tpp_messaging-service-pool'			=> 'operations',
+		'tpp_commitlog'                         => 'commits',
+		'tpp_compaction-pool'                   => 'compactions',
+
+	};
 	return $absolute;
 }
 
