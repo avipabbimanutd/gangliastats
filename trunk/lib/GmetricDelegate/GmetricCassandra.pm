@@ -104,7 +104,9 @@ sub gettpstatsData{
 	while(<CMD>){
 		next if ($_ =~ /^Pool Name/);
 		my ($key, $active, $pending, $completed) = split(/\s+/, $_);
-		$hashref->{$key} = $completed;
+		$hashref->{'tpa_'.$key} = $active;
+		$hashref->{'tpp_'.$key} = $pending;
+		$hashref->{'tpc_'.$key} = $completed;
 
 	}
 	return $hashref;
