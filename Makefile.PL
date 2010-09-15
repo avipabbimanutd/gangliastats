@@ -75,11 +75,22 @@ if (defined $jmx_port){
 # actually write the nix makefile
 #
 
+my $dst_files = ['ganglia_gmetric', 'ganglia_gmetric.pl'];
+my $dst_file_str = join(" ", @$dst_files);
+my $exec_files = [] ;
+foreach my $file(@$dst_files){
+	if (!-e "bin/$file"){
+		open(FH, ">bin/$file");
+		close(FH);
+	}
+	push(@$exec_files, "bin/$file");
+}
+
 WriteMakefile (
-		NAME         => 'GmetricDelegate::GmetricCassandra',
-		VERSION      => "0.01",
-		PL_FILES     => {'bin/make_test.pl' => 'bin/make_test'},
-		'EXE_FILES'	 => [ 'bin/ganglia_gmetric' ],
+		'NAME'         => 'GmetricDelegate::GmetricCassandra',
+		'VERSION'      => "0.01",
+		'PL_FILES'     => {'bin/make_test.pl' =>  $dst_files },
+		'EXE_FILES'     => $exec_files,
 		'LIBS'		 => [''], # e.g., '-lm'
 		'DEFINE'	 => '', # e.g., '-DHAVE_SOMETHING'
 		'INC'		 => '', # e.g., '-I/usr/include/other'
