@@ -72,19 +72,30 @@ if (defined $jmx_port){
 }
 
 #
-# actually write the nix makefile
+# tell the PL_FILES SCRIPT to generate the dst files
 #
 
 my $dst_files = ['ganglia_gmetric', 'ganglia_gmetric.pl'];
-my $dst_file_str = join(" ", @$dst_files);
+
+#
+# now build the exec_files list
+#
+
 my $exec_files = [] ;
 foreach my $file(@$dst_files){
-	if (!-e "bin/$file"){
-		open(FH, ">bin/$file");
-		close(FH);
-	}
+
+	#
+	# reset the dst files
+	#
+
+	open(FH, ">bin/$file");
+	close(FH);
 	push(@$exec_files, "bin/$file");
 }
+
+#
+# actually write the nix makefile
+#
 
 WriteMakefile (
 		'NAME'         => 'GmetricDelegate::GmetricCassandra',
