@@ -157,11 +157,19 @@ sub sendGmetricData($$$){
 	if ($old_time){
 		$timedelta = time() - $old_time;
 	}
+	if ($timedelta <= 0){
+		print "skipping run not enough time has passed\n";
+		return;
+	}
 	foreach my $metric (keys %{$dataNow}){
 		my $cmd = '';	
 		next if ($dataNow->{$metric} !~ /\d+/); #not a number then skip
 		if ($units = $counter_metrics->{$metric}){
 			my $rate = ($dataNow->{$metric} - $dataLastRun->{$metric})/$timedelta;
+			if ($rate < 0){
+				print "Counter for metric $metric -- Reset. Skipping.";
+				next;
+			}
 			$cmd  = $gmetric_command . " -u '$units/sec' -tfloat -n $ganglia_prefix" . $metric . " -v " . $rate;
 			print $cmd,"\n";
 

@@ -63,6 +63,8 @@ while(my $line = <TMPL>){
 	print GGM $line;
 }
 
+chmod(0655, "./bin/$file");
+
 close(TMPL);
 close(GGM);
 	
