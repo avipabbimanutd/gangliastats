@@ -1,9 +1,16 @@
 #!/usr/bin/perl -w 
+#
+# some like ganglia_gmetric.pl over ganglia_gmetric
+#
+my $file = $ARGV[0];
 
+if (!$file){
+	die("File needs to be supplied\n");
+}
+print "Building $file\n";
 
-
-open(GMD, "<./lib/GmetricDelegate.pm") or die("$!\n");
-open(GMC, "<./lib/GmetricDelegate/GmetricCassandra.pm") or die("$!\n");
+open(GMD, "<./lib/GmetricDelegate.pm") or die("GmetricDelegate.pm not found: $!\n");
+open(GMC, "<./lib/GmetricDelegate/GmetricCassandra.pm") or die("GmetricCassandra.pm not found: $!\n");
 
 #
 # now replace the stubs
@@ -39,8 +46,16 @@ while(my $line = <GMC>){
 
 close(GMD);
 close(GMC);
+
+#
+# read the template file
+#
 open(TMPL, "<./bin/ganglia_gmetric_tmpl") or die("$!\n");
-open(GGM, ">./bin/ganglia_gmetric") or die("$!\n");
+
+#
+# write the destination file
+#
+open(GGM, ">./bin/$file") or die("$!\n");
 
 print GGM $prepend,"\n";
 
